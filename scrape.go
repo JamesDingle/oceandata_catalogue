@@ -89,9 +89,6 @@ func f_link(n *html.Node) (links map[string]string, ok bool) {
 			}
 		}
 
-		//s = n.Attr[0].Val
-		//fmt.Println(n.Attr)
-		//return
 	} else {
 
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
@@ -102,9 +99,6 @@ func f_link(n *html.Node) (links map[string]string, ok bool) {
 				}
 				ok = true
 			}
-			//if !ok {
-			//	return
-			//}
 		}
 	}
 
@@ -155,7 +149,6 @@ func handle(url string) {
 
 	vals, v_ok := f_table(doc, "tbody")
 
-	//fmt.Println(vals)
 	v_len := len(vals)
 
 	if !v_ok || v_len == 0 {
@@ -169,7 +162,6 @@ func handle(url string) {
 		item.filename = vals[i]
 		item.mod_time = dateFromString(vals[i+1])
 		item.size, _ = strconv.Atoi(vals[i+2])
-		//item.link = vals[i+3]
 		results = append(results, item)
 	}
 
@@ -192,10 +184,6 @@ func handle(url string) {
 
 func main() {
 
-	//url := "https://oceandata.sci.gsfc.nasa.gov/Ancillary/LUTs/modis/"
-	//handle(url)
-
-	// Kick off the handle process (concurrently)
 	urls := os.Args[1:]
 	for _, url := range urls {
 		fmt.Println("Handling URL: ", url)
