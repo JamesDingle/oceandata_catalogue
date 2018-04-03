@@ -5,10 +5,10 @@ import (
 	"golang.org/x/net/html"
 	"net/http"
 	"os"
+	"path"
+	"strconv"
 	"time"
 	"unicode"
-	//strftime "github.com/jehiah/go-strftime"
-	"strconv"
 )
 
 type data struct {
@@ -35,14 +35,12 @@ func check_header(n *html.Node) (arr []string, ok bool) {
 			if !is_all_whitespace(c.Data) {
 				arr = append(arr, c.Data)
 				ok = true
-				//return
 			}
 		} else {
 			vals, test := check_header(c)
 			if test {
 				arr = append(arr, vals...)
 				ok = test
-				//return arr, ok
 
 			}
 
@@ -53,8 +51,6 @@ func check_header(n *html.Node) (arr []string, ok bool) {
 }
 
 func f_table(n *html.Node, f string) (arr []string, ok bool) {
-
-	//fmt.Println("Searching table under: ", f)
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 
@@ -77,19 +73,40 @@ func f_table(n *html.Node, f string) (arr []string, ok bool) {
 	return
 }
 
-func f_link(n *html.Node) (s string, ok bool) {
-	if n.Type == html.ElementNode && n.Data == "a" {
-		s = n.Attr[0].Val
-		ok = true
-		return
-	}
+func f_link(n *html.Node) (links map[string]string, ok bool) {
 
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		s, ok = f_link(c)
-		if ok {
-			return
+	links = make(map[string]string)
+
+	if n.Type == html.ElementNode && n.Data == "a" {
+
+		if len(n.Attr) > 0 {
+			if n.Attr[0].Key == "href" {
+				link := n.Attr[0].Val
+				base := path.Base(link)
+				links[base] = link
+				ok = true
+			}
+		}
+
+		//s = n.Attr[0].Val
+		//fmt.Println(n.Attr)
+		//return
+	} else {
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			n_links, nok := f_link(c)
+			if nok {
+				for key, val := range n_links {
+					links[key] = val
+				}
+				ok = true
+			}
+			//if !ok {
+			//	return
+			//}
 		}
 	}
+
 	return
 }
 
@@ -126,7 +143,7 @@ func handle(url string) {
 	var h_ok bool
 
 	header, h_ok = f_table(doc, "thead")
-	fmt.Println("Returned header: ", header, " check: ", h_ok)
+	fmt.Println("Returned header: ", header, " Checked: ", h_ok)
 
 	h_len := len(header)
 
@@ -135,19 +152,18 @@ func handle(url string) {
 		os.Exit(2)
 	}
 
-	vals , v_ok := f_table(doc, "tbody")
-
+	vals, v_ok := f_table(doc, "tbody")
 
 	//fmt.Println(vals)
 	v_len := len(vals)
 
-	if !v_ok || v_len == 0  {
+	if !v_ok || v_len == 0 {
 		fmt.Println("Exiting due to no table header found")
 		os.Exit(2)
 	}
 	var results []data
 
-	for i := 0; i < v_len; i+=3 {
+	for i := 0; i < v_len; i += 3 {
 		var item data
 		item.filename = vals[i]
 		item.mod_time = dateFromString(vals[i+1])
@@ -156,7 +172,15 @@ func handle(url string) {
 		results = append(results, item)
 	}
 
-	for _, val := range(results) {
+	linkmap, linkok := f_link(doc)
+
+	for i, val := range results {
+		if linkok {
+			if link, ok := linkmap[val.filename]; ok {
+				val.link = link
+				results[i] = val
+			}
+		}
 		printData(val)
 	}
 
@@ -167,7 +191,7 @@ func main() {
 	//url := "https://oceandata.sci.gsfc.nasa.gov/Ancillary/LUTs/modis/"
 	//handle(url)
 	//
-	//  //Kick off the handle process (concurrently)
+	// Kick off the handle process (concurrently)
 	urls := os.Args[1:]
 	for _, url := range urls {
 		fmt.Println("Handling URL: ", url)
