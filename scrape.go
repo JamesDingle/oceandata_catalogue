@@ -1,20 +1,21 @@
 package main
 
 import (
-	"net/http"
 	"fmt"
 	"golang.org/x/net/html"
-	"unicode"
+	"net/http"
 	"os"
 	"time"
+	"unicode"
 	//strftime "github.com/jehiah/go-strftime"
+	"strconv"
 )
 
 type data struct {
 	filename string
-	link string
+	link     string
 	mod_time time.Time
-	size int
+	size     int
 }
 
 func is_all_whitespace(s string) (ok bool) {
@@ -28,21 +29,20 @@ func is_all_whitespace(s string) (ok bool) {
 
 func check_header(n *html.Node) (arr []string, ok bool) {
 
-
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 
 		if c.Type == html.TextNode {
 			if !is_all_whitespace(c.Data) {
 				arr = append(arr, c.Data)
 				ok = true
-				return arr, ok
+				//return
 			}
 		} else {
 			vals, test := check_header(c)
 			if test {
 				arr = append(arr, vals...)
 				ok = test
-				return arr, ok
+				//return arr, ok
 
 			}
 
@@ -54,42 +54,24 @@ func check_header(n *html.Node) (arr []string, ok bool) {
 
 func f_table(n *html.Node, f string) (arr []string, ok bool) {
 
-
 	//fmt.Println("Searching table under: ", f)
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 
 		if c.Data == f {
-			fmt.Println("Found node: ", f)
 
 			if c.Type == html.ElementNode {
-				fmt.Println("Is an element node...")
-			} else {
-				fmt.Println(c.Type)
+				arr, ok = check_header(c)
+				return
 			}
 
-		}
-
-		if c.Type == html.ElementNode && c.Data == f {
-			h_arr, h_ok := check_header(c)
-			if h_ok && f == "tbody" {
-				fmt.Println("----", arr[0])
-				link, check := f_link(c)
-				if check {
-					fmt.Println("Found link: ", link)
-					h_arr = append(h_arr, link)
-				}
-				arr = append(arr, h_arr...)
-				ok = true
-			}
-			//if ok { return }
 		} else {
-			arr, ok = f_table(c,f)
+			arr, ok = f_table(c, f)
 			if ok {
-				//fmt.Println(f_link(c.FirstChild))
 				return
 			}
 		}
+
 	}
 
 	return
@@ -104,7 +86,9 @@ func f_link(n *html.Node) (s string, ok bool) {
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		s, ok = f_link(c)
-		if ok { return }
+		if ok {
+			return
+		}
 	}
 	return
 }
@@ -138,63 +122,56 @@ func handle(url string) {
 		return
 	}
 
+	var header []string
+	var h_ok bool
 
-
-	header, h_ok := f_table(doc, "thead")
+	header, h_ok = f_table(doc, "thead")
+	fmt.Println("Returned header: ", header, " check: ", h_ok)
 
 	h_len := len(header)
 
-	fmt.Println("Header elements: ", h_len)
-
-	if !h_ok || h_len == 0  {
+	if !h_ok || h_len == 0 {
 		fmt.Println("Exiting due to no table header found")
 		os.Exit(2)
 	}
 
-	for i, val := range(header) {
-		fmt.Println(i, val)
+	vals , v_ok := f_table(doc, "tbody")
+
+
+	//fmt.Println(vals)
+	v_len := len(vals)
+
+	if !v_ok || v_len == 0  {
+		fmt.Println("Exiting due to no table header found")
+		os.Exit(2)
+	}
+	var results []data
+
+	for i := 0; i < v_len; i+=3 {
+		var item data
+		item.filename = vals[i]
+		item.mod_time = dateFromString(vals[i+1])
+		item.size, _ = strconv.Atoi(vals[i+2])
+		//item.link = vals[i+3]
+		results = append(results, item)
 	}
 
-
-	//vals , v_ok := f_table(doc, "tbody")
-	//fmt.Println(vals)
-	//
-	////fmt.Println(vals)
-	//v_len := len(vals)
-	//
-	//if !v_ok || v_len == 0  {
-	//	fmt.Println("Exiting due to no table header found")
-	//	os.Exit(2)
-	//}
-	//var results []data
-	//
-	//for i := 0; i < v_len; i+=3 {
-	//	var item data
-	//	fmt.Println(i, v_len)
-	//	item.filename = vals[i]
-	//	item.mod_time = dateFromString(vals[i+1])
-	//	item.size, _ = strconv.Atoi(vals[i+2])
-	//	//item.link = vals[i+3]
-	//	results = append(results, item)
-	//}
-	//
-	//for _, val := range(results) {
-	//	printData(val)
-	//}
-
+	for _, val := range(results) {
+		printData(val)
+	}
 
 }
 
 func main() {
 
-	url := "https://oceandata.sci.gsfc.nasa.gov/Ancillary/LUTs/modis/"
-	handle(url)
+	//url := "https://oceandata.sci.gsfc.nasa.gov/Ancillary/LUTs/modis/"
+	//handle(url)
 	//
-	////  //Kick off the handle process (concurrently)
-	//urls := os.Args[1:]
-	//for _, url := range urls {
-	//	fmt.Println("Handling URL: ", url)
-	//	handle(url)
-	//}
+	//  //Kick off the handle process (concurrently)
+	urls := os.Args[1:]
+	for _, url := range urls {
+		fmt.Println("Handling URL: ", url)
+		handle(url)
+	}
 
 }
