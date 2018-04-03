@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 	"unicode"
+	"strings"
 )
 
 type data struct {
@@ -177,6 +178,9 @@ func handle(url string) {
 	for i, val := range results {
 		if linkok {
 			if link, ok := linkmap[val.filename]; ok {
+				if strings.HasPrefix(link, "/") {
+					link = path.Join(url, path.Base(link))
+				}
 				val.link = link
 				results[i] = val
 			}
@@ -190,7 +194,7 @@ func main() {
 
 	//url := "https://oceandata.sci.gsfc.nasa.gov/Ancillary/LUTs/modis/"
 	//handle(url)
-	//
+
 	// Kick off the handle process (concurrently)
 	urls := os.Args[1:]
 	for _, url := range urls {
